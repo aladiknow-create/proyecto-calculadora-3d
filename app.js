@@ -220,8 +220,8 @@ const loadHistory = () => {
   if (currentUser) return firestoreHistory;
   try { return JSON.parse(localStorage.getItem(HISTORY_KEY)) || []; } catch { return []; }
 };
-const saveHistory = l => {
-  if (!currentUser) localStorage.setItem(HISTORY_KEY, JSON.stringify(l));
+const saveHistory = (l, forceLocal = false) => {
+  if (!currentUser || forceLocal) localStorage.setItem(HISTORY_KEY, JSON.stringify(l));
 };
 
 function renderHistory() {
@@ -275,7 +275,10 @@ $('btnSave').addEventListener('click', async () => {
       showToast(`❌ Error: ${e.code || e.message}`, true);
       setTimeout(() => {
         showToast('💾 Guardando en localStorage como respaldo...', true);
-        const list = loadHistory(); list.unshift(item); if (list.length > 50) list.pop(); saveHistory(list); renderHistory();
+        let list;
+        try { list = JSON.parse(localStorage.getItem(HISTORY_KEY)) || []; } catch { list = []; }
+        list.unshift(item); if (list.length > 50) list.pop(); saveHistory(list, true); 
+        firestoreHistory.unshift(item); renderHistory();
         btn.textContent = '⚠️ Guardado localmente';
       }, 2000);
     }
@@ -341,7 +344,7 @@ const loadDiary = () => {
   if (currentUser) return firestoreDiary;
   try { return JSON.parse(localStorage.getItem(DIARY_KEY)) || []; } catch { return []; }
 };
-const saveDiary = l => { if (!currentUser) localStorage.setItem(DIARY_KEY, JSON.stringify(l)); };
+const saveDiary = (l, forceLocal = false) => { if (!currentUser || forceLocal) localStorage.setItem(DIARY_KEY, JSON.stringify(l)); };
 
 let diaryFilter = 'all', diarySearch = '', currentType = 'buy';
 
@@ -484,7 +487,10 @@ $('dBtnAdd').addEventListener('click', async () => {
       showToast(`❌ Error: ${e.code || e.message}`, true);
       setTimeout(() => {
         showToast('💾 Guardando en localStorage como respaldo...', true);
-        const data = loadDiary(); data.unshift(entry); saveDiary(data); renderDiary();
+        let data;
+        try { data = JSON.parse(localStorage.getItem(DIARY_KEY)) || []; } catch { data = []; }
+        data.unshift(entry); saveDiary(data, true); 
+        firestoreDiary.unshift(entry); renderDiary();
       }, 2000);
     }
   } else {
