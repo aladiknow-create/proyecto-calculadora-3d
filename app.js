@@ -706,12 +706,14 @@ auth.onAuthStateChanged(user => {
       .onSnapshot(
         snap => { 
           console.log('📋 Historial cargado:', snap.docs.length, 'documentos');
+          console.log('📋 Docs:', snap.docs.map(d => ({ id: d.id, data: d.data() })));
           firestoreHistory = snap.docs.map(d => ({ _id: d.id, ...d.data() })); 
           renderHistory(); 
         },
         error => { 
-          console.error('❌ Error al cargar historial:', error.code, error.message);
-          showToast(`❌ Error cargando historial: ${error.code}`, true);
+          console.error('❌ Error CRÍTICO cargando historial:', error.code, error.message);
+          console.error('Error completo:', error);
+          showToast(`❌ Error Firestore Historial: ${error.code} - ${error.message}`, true);
         }
       );
     // Subscribe to Firestore diary
@@ -720,12 +722,14 @@ auth.onAuthStateChanged(user => {
       .onSnapshot(
         snap => { 
           console.log('📒 Diario cargado:', snap.docs.length, 'documentos');
+          console.log('📒 Docs:', snap.docs.map(d => ({ id: d.id, data: d.data() })));
           firestoreDiary = snap.docs.map(d => ({ _id: d.id, ...d.data() })); 
           if (!$('page-diary').classList.contains('page-hidden')) renderDiary(); 
         },
         error => { 
-          console.error('❌ Error al cargar diario:', error.code, error.message);
-          showToast(`❌ Error cargando diario: ${error.code}`, true);
+          console.error('❌ Error CRÍTICO cargando diario:', error.code, error.message);
+          console.error('Error completo:', error);
+          showToast(`❌ Error Firestore Diario: ${error.code} - ${error.message}`, true);
         }
       );
     offerMigration(user);
