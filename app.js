@@ -610,26 +610,46 @@ function showToast(msg, isError = false) {
 }
 
 // ── MIGRATION from localStorage to Firestore ──
+const MIGRATION_KEY = 'printcost_migration_done';
 function offerMigration(user) {
+  const migrationDone = localStorage.getItem(MIGRATION_KEY);
+  if (migrationDone) {
+    console.log('✅ Migración ya realizada anteriormente, no mostrar banner');
+    return;
+  }
   const lh = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
   const ld = JSON.parse(localStorage.getItem(DIARY_KEY)   || '[]');
-  if (!lh.length && !ld.length) return;
+  if (!lh.length && !ld.length) { localStorage.setItem(MIGRATION_KEY, 'true'); return; }
   setTimeout(() => {
-    if (firestoreHistory.length > 0 || firestoreDiary.length > 0) return;
+    if (firestoreHistory.length > 0 || firestoreDiary.length > 0) { localStorage.setItem(MIGRATION_KEY, 'true'); return; }
     const total = lh.length + ld.length; if (!total) return;
     const banner = document.createElement('div');
     banner.id = 'migrationBanner'; banner.className = 'migration-banner';
-    banner.innerHTML = `<div class="migration-inner"><span>📦 Tienes ${total} entradas locales. ¿Subirlas a la nube?</span><div class="migration-actions"><button id="btnMigYes" class="btn-mig-yes">☁️ Subir</button><button id="btnMigNo" class="btn-mig-no">No</button></div></div>`;
+    banner.innerHTML = `<div class="migration-inner"><span>📦 Tienes ${total} entradas locales. ¿Subirlas a la nube?</span><div class="migration-actions"><button id="btnMigYes" class="btn-mig-yes">☁️ Subir</button><button id="btnMigNo" class="btn-mig-no">No, descartar</button></div></div>`;
     document.body.appendChild(banner);
     $('btnMigYes').addEventListener('click', async () => {
       banner.remove();
       const batch = db.batch();
       lh.forEach(item => { const ref = db.collection(`users/${user.uid}/history`).doc(); batch.set(ref, { ...item, createdAt: firebase.firestore.FieldValue.serverTimestamp() }); });
       ld.forEach(item => { const ref = db.collection(`users/${user.uid}/diary`).doc(); batch.set(ref, { ...item, createdAt: firebase.firestore.FieldValue.serverTimestamp() }); });
-      try { await batch.commit(); localStorage.removeItem(HISTORY_KEY); localStorage.removeItem(DIARY_KEY); showToast(`✅ ${total} entradas subidas a la nube`); }
-      catch (e) { showToast('❌ Error al migrar datos', true); }
+      try { 
+        await batch.commit(); 
+        localStorage.removeItem(HISTORY_KEY); 
+        localStorage.removeItem(DIARY_KEY);
+        localStorage.setItem(MIGRATION_KEY, 'true');
+        console.log(`✅ ${total} entradas subidas a la nube`);
+        showToast(`✅ ${total} entradas subidas a la nube`); 
+      }
+      catch (e) { 
+        console.error('Error migración:', e);
+        showToast('❌ Error al migrar datos', true); 
+      }
     });
-    $('btnMigNo').addEventListener('click', () => banner.remove());
+    $('btnMigNo').addEventListener('click', () => { 
+      localStorage.setItem(MIGRATION_KEY, 'true');
+      banner.remove(); 
+      showToast('💾 Datos locales mantenidos');
+    });
   }, 1500);
 }
 
