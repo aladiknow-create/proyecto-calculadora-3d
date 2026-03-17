@@ -268,8 +268,8 @@ $('btnSave').addEventListener('click', async () => {
       console.log('📤 Guardando en Firestore/users/' + currentUser.uid + '/history');
       const ref = await db.collection(`users/${currentUser.uid}/history`).add({ ...item, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
       console.log('✅ Guardado exitoso en Firestore:', ref.id);
-      showToast('☁️ Guardado en la nube');
-      btn.textContent = '✅ Guardado!';
+      showToast('☁️ ✅ Guardado exitosamente en la nube');
+      btn.textContent = '✅ ¡Guardado en nube!';
     } catch (e) {
       console.error('❌ Error Firestore - Code:', e.code, 'Message:', e.message, 'Stack:', e.stack);
       showToast(`❌ Error: ${e.code || e.message}`, true);
@@ -478,7 +478,7 @@ $('dBtnAdd').addEventListener('click', async () => {
       console.log('📤 Guardando en Firestore/users/' + currentUser.uid + '/diary');
       const ref = await db.collection(`users/${currentUser.uid}/diary`).add({ ...entry, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
       console.log('✅ Entrada guardada exitosamente en Firestore:', ref.id);
-      showToast('☁️ Entrada guardada en la nube');
+      showToast('☁️ ✅ Entrada guardada en la nube');
     } catch (e) {
       console.error('❌ Error Firestore - Code:', e.code, 'Message:', e.message, 'Stack:', e.stack);
       showToast(`❌ Error: ${e.code || e.message}`, true);
