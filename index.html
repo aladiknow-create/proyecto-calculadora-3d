@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PrintCost — Calculadora de Impresión 3D</title>
+  <meta name="description" content="Calcula el precio de coste real de tus modelos impresos en 3D. Incluye filamento, electricidad, mano de obra, depreciación y más." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- ── HEADER ── -->
+  <header class="header">
+    <div class="header-inner">
+      <div class="logo">
+        <svg width="34" height="34" viewBox="0 0 34 34" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <polygon points="17,2 32,10 32,24 17,32 2,24 2,10" fill="url(#hexGrad)" stroke="none"/>
+          <defs>
+            <linearGradient id="hexGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#a78bfa"/>
+              <stop offset="100%" stop-color="#38bdf8"/>
+            </linearGradient>
+          </defs>
+          <text x="17" y="22" text-anchor="middle" font-size="13" font-weight="700" fill="white" font-family="Inter">3D</text>
+        </svg>
+        <span>PrintCost</span>
+      </div>
+      <div class="header-controls">
+        <div class="currency-select-wrap">
+          <label for="currency">Moneda</label>
+          <select id="currency">
+            <option value="&euro;">&euro; Euro</option>
+            <option value="$">$ Dólar</option>
+            <option value="&pound;">&pound; Libra</option>
+          </select>
+        </div>
+        <button class="theme-toggle" id="themeToggle" title="Cambiar tema" aria-label="Toggle theme">
+          <svg id="iconSun" class="theme-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+          <svg id="iconMoon" class="theme-icon hidden" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        </button>
+        <!-- AUTH BUTTON -->
+        <button class="auth-login-btn" id="authLoginBtn" title="Iniciar sesión">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          Entrar
+        </button>
+        <!-- USER AVATAR (shown when logged in) -->
+        <div class="auth-user-avatar hidden" id="authUserAvatar" title="Tu cuenta">
+          <img id="authAvatarImg" src="" alt="avatar" class="hidden" />
+          <span id="authAvatarInitial"></span>
+          <!-- Dropdown menu -->
+          <div class="auth-user-menu" id="authUserMenu">
+            <div class="auth-user-info">
+              <span id="authUserName" class="auth-user-name">Usuario</span>
+              <span id="authUserEmail" class="auth-user-email"></span>
+            </div>
+            <hr class="auth-menu-divider"/>
+            <button class="auth-menu-item" id="authLogout">🚪 Cerrar sesión</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ── TAB NAV ── -->
+  <nav class="tab-nav" role="tablist">
+    <div class="tab-nav-inner">
+      <button class="tab-btn active" id="tab-calc" role="tab" aria-selected="true" aria-controls="page-calc">
+        🧮 Calculadora
+      </button>
+      <button class="tab-btn" id="tab-diary" role="tab" aria-selected="false" aria-controls="page-diary">
+        📒 Diario de Compras y Ventas
+      </button>
+    </div>
+  </nav>
+
+  <!-- ══════════════════════════════════════════════
+       PAGE 1 — CALCULADORA
+  ══════════════════════════════════════════════ -->
+  <main class="main" id="page-calc">
+
+    <section class="hero">
+      <h1>Calculadora de Coste<br/><span class="gradient-text">3D Print</span></h1>
+      <p class="hero-sub">Calcula el coste real de cada impresión. Filamento, electricidad, mano de obra, depreciación y más.</p>
+    </section>
+
+    <div class="grid">
+      <div class="inputs-column">
+
+        <!-- FILAMENTO -->
+        <div class="card" id="card-filament">
+          <div class="card-header"><span class="card-icon">🧵</span><h2>Filamento</h2></div>
+          <div class="form-group">
+            <label for="materialType">Tipo de material</label>
+            <select id="materialType">
+              <option value="pla">PLA — 20 €/kg</option>
+              <option value="petg">PETG — 25 €/kg</option>
+              <option value="abs">ABS — 22 €/kg</option>
+              <option value="asa">ASA — 28 €/kg</option>
+              <option value="tpu">TPU — 30 €/kg</option>
+              <option value="resin">Resina — 35 €/kg</option>
+              <option value="custom">Personalizado</option>
+            </select>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="filamentPrice">Precio filamento (<span class="sym">€</span>/kg)</label>
+              <input type="number" id="filamentPrice" value="20" min="0" step="0.01" />
+            </div>
+            <div class="form-group">
+              <label for="filamentUsed">Gramos usados (g)</label>
+              <input type="number" id="filamentUsed" value="50" min="0" step="1" />
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="wastage">% Desperdicio de filamento</label>
+            <div class="slider-row">
+              <input type="range" id="wastage" min="0" max="30" value="5" step="1" class="slider" />
+              <span class="slider-value" id="wastageVal">5%</span>
+            </div>
+          </div>
+          <div class="result-line"><span>Coste filamento</span><strong id="r-filament">0,00 €</strong></div>
+        </div>
+
+        <!-- ELECTRICIDAD -->
+        <div class="card" id="card-electricity">
+          <div class="card-header"><span class="card-icon">⚡</span><h2>Electricidad</h2></div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="printerWatts">Potencia impresora (W)</label>
+              <input type="number" id="printerWatts" value="200" min="0" step="10" />
+            </div>
+            <div class="form-group">
+              <label for="printHours">Tiempo de impresión (h)</label>
+              <input type="number" id="printHours" value="3" min="0" step="0.25" />
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="kwhPrice">Precio electricidad (<span class="sym">€</span>/kWh)</label>
+            <input type="number" id="kwhPrice" value="0.15" min="0" step="0.001" />
+          </div>
+          <div class="result-line"><span>Coste eléctrico</span><strong id="r-electricity">0,00 €</strong></div>
+        </div>
+
+        <!-- MANO DE OBRA -->
+        <div class="card" id="card-labor">
+          <div class="card-header"><span class="card-icon">👷</span><h2>Mano de Obra</h2></div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="laborRate">Tarifa horaria (<span class="sym">€</span>/h)</label>
+              <input type="number" id="laborRate" value="15" min="0" step="0.5" />
+            </div>
+            <div class="form-group">
+              <label for="laborHours">Horas de trabajo</label>
+              <input type="number" id="laborHours" value="0.5" min="0" step="0.25" />
+            </div>
+          </div>
+          <div class="result-line"><span>Coste de mano de obra</span><strong id="r-labor">0,00 €</strong></div>
+        </div>
+
+        <!-- DEPRECIACIÓN -->
+        <div class="card" id="card-depr">
+          <div class="card-header"><span class="card-icon">📉</span><h2>Depreciación de Impresora</h2></div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="printerCost">Coste impresora (<span class="sym">€</span>)</label>
+              <input type="number" id="printerCost" value="300" min="0" step="10" />
+            </div>
+            <div class="form-group">
+              <label for="printerLife">Vida útil estimada (h)</label>
+              <input type="number" id="printerLife" value="5000" min="1" step="100" />
+            </div>
+          </div>
+          <div class="result-line"><span>Coste depreciación</span><strong id="r-depr">0,00 €</strong></div>
+        </div>
+
+        <!-- POST-PROCESADO -->
+        <div class="card" id="card-post">
+          <div class="card-header"><span class="card-icon">🎨</span><h2>Post-Procesado</h2></div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="postCost">Coste post-procesado (<span class="sym">€</span>)</label>
+              <input type="number" id="postCost" value="0" min="0" step="0.5" />
+            </div>
+            <div class="form-group">
+              <label for="packagingCost">Embalaje y envío (<span class="sym">€</span>)</label>
+              <input type="number" id="packagingCost" value="0" min="0" step="0.5" />
+            </div>
+          </div>
+          <div class="result-line"><span>Coste post-procesado + envío</span><strong id="r-post">0,00 €</strong></div>
+        </div>
+
+        <!-- RIESGO & MÁRGENES -->
+        <div class="card" id="card-margins">
+          <div class="card-header"><span class="card-icon">📊</span><h2>Riesgo y Márgenes</h2></div>
+          <div class="form-group">
+            <label for="failureRisk">% Riesgo de fallo</label>
+            <div class="slider-row">
+              <input type="range" id="failureRisk" min="0" max="50" value="10" step="1" class="slider" />
+              <span class="slider-value" id="failureRiskVal">10%</span>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="profitMargin">% Margen de beneficio</label>
+            <div class="slider-row">
+              <input type="range" id="profitMargin" min="0" max="200" value="20" step="1" class="slider" />
+              <span class="slider-value" id="profitMarginVal">20%</span>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="vatRate">% IVA / Impuesto</label>
+            <div class="slider-row">
+              <input type="range" id="vatRate" min="0" max="30" value="21" step="1" class="slider" />
+              <span class="slider-value" id="vatRateVal">21%</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- NOMBRE DEL PROYECTO -->
+        <div class="card" id="card-name">
+          <div class="card-header"><span class="card-icon">📝</span><h2>Nombre de impresión</h2></div>
+          <div class="form-group">
+            <input type="text" id="printName" placeholder="Ej: Figura Dragon v2..." maxlength="60" />
+          </div>
+          <button class="btn-calculate" id="btnCalcular">🔢 Calcular</button>
+          <button class="btn-save" id="btnSave" style="margin-top:0.6rem">💾 Guardar en historial</button>
+        </div>
+
+
+      </div>
+
+      <!-- RIGHT COLUMN: RESULTS -->
+      <div class="results-column">
+        <div class="card card-result" id="card-main-result">
+          <div class="card-header"><span class="card-icon">💰</span><h2>Resultado</h2></div>
+          <div class="result-breakdown">
+            <div class="breakdown-row"><span>Coste de materiales</span><strong id="b-material">0,00 €</strong></div>
+            <div class="breakdown-row"><span>Electricidad</span><strong id="b-electricity">0,00 €</strong></div>
+            <div class="breakdown-row"><span>Mano de obra</span><strong id="b-labor">0,00 €</strong></div>
+            <div class="breakdown-row"><span>Depreciación</span><strong id="b-depr">0,00 €</strong></div>
+            <div class="breakdown-row"><span>Post-procesado + envío</span><strong id="b-post">0,00 €</strong></div>
+            <div class="breakdown-row sub"><span>Subtotal</span><strong id="b-subtotal">0,00 €</strong></div>
+            <div class="breakdown-row warn"><span>+ Riesgo de fallo</span><strong id="b-risk">0,00 €</strong></div>
+            <div class="breakdown-row profit"><span>+ Margen de beneficio</span><strong id="b-margin">0,00 €</strong></div>
+            <div class="breakdown-row tax"><span>+ IVA</span><strong id="b-vat">0,00 €</strong></div>
+          </div>
+          <div class="final-price">
+            <span>Precio final</span>
+            <div class="price-big" id="finalPrice">0,00 €</div>
+          </div>
+          <div class="price-per"><span>Precio por gramo:</span> <strong id="pricePerGram">— €/g</strong></div>
+        </div>
+
+        <div class="card card-chart">
+          <div class="card-header"><span class="card-icon">🍩</span><h2>Desglose de costes</h2></div>
+          <div class="chart-container"><canvas id="costChart"></canvas></div>
+        </div>
+
+        <div class="card card-history">
+          <div class="card-header"><span class="card-icon">🕓</span><h2>Historial de impresiones</h2></div>
+          <div id="historyList" class="history-list">
+            <p class="history-empty">Sin impresiones guardadas aún.</p>
+          </div>
+          <div class="history-actions">
+            <button class="btn-export" id="btnExportHistory">📥 Exportar CSV</button>
+            <button class="btn-clear" id="btnClear">🗑️ Limpiar historial</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ══════════════════════════════════════════════
+       PAGE 2 — DIARIO DE COMPRAS Y VENTAS
+  ══════════════════════════════════════════════ -->
+  <main class="main page-hidden" id="page-diary">
+
+    <section class="hero">
+      <h1>Diario de<br/><span class="gradient-text">Compras y Ventas</span></h1>
+      <p class="hero-sub">Registra tus gastos en material e ingresos por ventas. Calcula tus beneficios o pérdidas en tiempo real.</p>
+    </section>
+
+    <!-- SUMMARY STATS -->
+    <div class="diary-stats">
+      <div class="stat-card stat-buy">
+        <div class="stat-icon">🛒</div>
+        <div class="stat-info">
+          <span class="stat-label">Total Compras</span>
+          <strong class="stat-value" id="d-total-buys">0,00 €</strong>
+        </div>
+      </div>
+      <div class="stat-card stat-sell">
+        <div class="stat-icon">💵</div>
+        <div class="stat-info">
+          <span class="stat-label">Total Ventas</span>
+          <strong class="stat-value" id="d-total-sells">0,00 €</strong>
+        </div>
+      </div>
+      <div class="stat-card stat-profit" id="stat-profit-card">
+        <div class="stat-icon" id="d-profit-icon">📈</div>
+        <div class="stat-info">
+          <span class="stat-label">Beneficio / Pérdida</span>
+          <strong class="stat-value" id="d-profit">0,00 €</strong>
+        </div>
+      </div>
+      <div class="stat-card stat-entries">
+        <div class="stat-icon">📋</div>
+        <div class="stat-info">
+          <span class="stat-label">Entradas totales</span>
+          <strong class="stat-value" id="d-entries">0</strong>
+        </div>
+      </div>
+    </div>
+
+    <div class="diary-grid">
+
+      <!-- LEFT: Form + Chart -->
+      <div class="diary-left">
+        <div class="card">
+          <div class="card-header"><span class="card-icon">➕</span><h2>Nueva Entrada</h2></div>
+
+          <div class="entry-type-toggle">
+            <button class="type-btn active" id="typeBuy" data-type="buy">🛒 Compra</button>
+            <button class="type-btn" id="typeSell" data-type="sell">💵 Venta</button>
+          </div>
+
+          <div class="form-group" style="margin-top:1rem">
+            <label for="dEntryName">Descripción</label>
+            <input type="text" id="dEntryName" placeholder="Ej: Bobina PLA Negro 1kg..." maxlength="80" />
+          </div>
+
+          <div id="buy-fields">
+            <div class="form-group">
+              <label for="dBuyCategory">Categoría</label>
+              <select id="dBuyCategory">
+                <option value="filamento">🧵 Filamento</option>
+                <option value="resina">🧪 Resina</option>
+                <option value="repuesto">🔧 Repuesto / Pieza</option>
+                <option value="herramienta">🛠️ Herramienta</option>
+                <option value="embalaje">📦 Embalaje</option>
+                <option value="otro">🗂️ Otro material</option>
+              </select>
+            </div>
+          </div>
+
+          <div id="sell-fields" class="hidden">
+            <div class="form-group">
+              <label for="dSellCategory">Categoría</label>
+              <select id="dSellCategory">
+                <option value="pieza">🖨️ Pieza impresa</option>
+                <option value="prototipo">🔩 Prototipo</option>
+                <option value="figura">🎭 Figura / Coleccionable</option>
+                <option value="funcional">⚙️ Pieza funcional</option>
+                <option value="otro">🗂️ Otro</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="dAmount">Importe (<span class="sym">€</span>)</label>
+              <input type="number" id="dAmount" min="0" step="0.01" placeholder="0,00" />
+            </div>
+            <div class="form-group">
+              <label for="dDate">Fecha</label>
+              <input type="date" id="dDate" />
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="dNotes">Notas (opcional)</label>
+            <input type="text" id="dNotes" placeholder="Proveedor, referencia, cliente..." maxlength="120" />
+          </div>
+
+          <button class="btn-save" id="dBtnAdd">➕ Añadir entrada</button>
+        </div>
+
+        <div class="card card-chart">
+          <div class="card-header"><span class="card-icon">📊</span><h2>Compras vs Ventas</h2></div>
+          <div class="chart-container"><canvas id="diaryChart"></canvas></div>
+        </div>
+      </div>
+
+      <!-- RIGHT: Ledger -->
+      <div class="diary-right">
+        <div class="card diary-ledger-card">
+          <div class="card-header" style="flex-wrap:wrap; gap:0.75rem">
+            <div style="display:flex;align-items:center;gap:0.6rem;flex:1">
+              <span class="card-icon">📒</span>
+              <h2>Registro</h2>
+            </div>
+            <div class="filter-btns">
+              <button class="filter-btn active" data-filter="all">Todos</button>
+              <button class="filter-btn" data-filter="buy">Compras</button>
+              <button class="filter-btn" data-filter="sell">Ventas</button>
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-bottom:1rem">
+            <input type="text" id="dSearch" placeholder="🔍 Buscar entrada..." />
+          </div>
+
+          <div id="diaryList" class="diary-list">
+            <p class="history-empty">Sin entradas registradas aún.<br/>Añade tu primera compra o venta.</p>
+          </div>
+
+          <div class="diary-list-footer">
+            <button class="btn-export" id="dBtnExport">📥 Exportar CSV</button>
+            <button class="btn-clear" id="dBtnClearAll">🗑️ Borrar todo el registro</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <footer class="footer">
+    <p>PrintCost · Calculadora de Impresión 3D</p>
+  </footer>
+
+  <!-- ── AUTH MODAL ── -->
+  <div class="auth-backdrop hidden" id="authBackdrop">
+    <div class="auth-modal" role="dialog" aria-modal="true" aria-labelledby="authModalTitle">
+      <button class="auth-modal-close" id="authClose" aria-label="Cerrar">✕</button>
+      <div class="auth-modal-header">
+        <svg width="36" height="36" viewBox="0 0 34 34" fill="none">
+          <polygon points="17,2 32,10 32,24 17,32 2,24 2,10" fill="url(#hexGrad2)"/>
+          <defs><linearGradient id="hexGrad2" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#a78bfa"/><stop offset="100%" stop-color="#38bdf8"/></linearGradient></defs>
+          <text x="17" y="22" text-anchor="middle" font-size="13" font-weight="700" fill="white" font-family="Inter">3D</text>
+        </svg>
+        <span class="auth-modal-brand">PrintCost</span>
+      </div>
+      <h2 class="auth-modal-title" id="authModalTitle">Iniciar sesión</h2>
+      <p class="auth-modal-sub">Sincroniza tus datos en cualquier dispositivo</p>
+
+      <button class="btn-google" id="btnGoogle">
+        <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+        Continuar con Google
+      </button>
+
+      <div class="auth-divider"><span>o</span></div>
+
+      <div class="form-group">
+        <label for="authEmail">Correo electrónico</label>
+        <input type="email" id="authEmail" placeholder="tu@email.com" autocomplete="email" />
+      </div>
+      <div class="form-group">
+        <label for="authPassword">Contraseña</label>
+        <input type="password" id="authPassword" placeholder="••••••••" autocomplete="current-password" />
+      </div>
+      <div class="form-group hidden" id="authPasswordConfirmGroup">
+        <label for="authPasswordConfirm">Confirmar contraseña</label>
+        <input type="password" id="authPasswordConfirm" placeholder="••••••••" autocomplete="new-password" />
+      </div>
+
+      <p class="auth-error hidden" id="authError"></p>
+
+      <button class="btn-calculate" id="btnAuthSubmit" style="width:100%;margin-top:0.5rem">Iniciar sesión</button>
+
+      <p class="auth-toggle">
+        <span id="authToggleText">¿No tienes cuenta?</span>
+        <button class="auth-toggle-btn" id="authToggleMode">Regístrate</button>
+      </p>
+    </div>
+  </div>
+
+  <!-- ── FIREBASE COMPAT CDN ── -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-analytics-compat.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
