@@ -1,29 +1,5 @@
 // ── PrintCost · app.js ──────────────────────────────────────────────────────
-
-// ══════════════════════════════════════════════
-// FIREBASE INIT
-// ══════════════════════════════════════════════
-const firebaseConfig = {
-  apiKey: "AIzaSyAuyBpvbCinSxDgFewuub6h5wC_kdkoEEI",
-  authDomain: "printcost-996e6.firebaseapp.com",
-  projectId: "printcost-996e6",
-  storageBucket: "printcost-996e6.firebasestorage.app",
-  messagingSenderId: "736996315310",
-  appId: "1:736996315310:web:4ce3498905a5a029b25d3f",
-  measurementId: "G-1Q3F0S2B99"
-};
-
-firebase.initializeApp(firebaseConfig);
-const auth = firebase.auth();
-const db   = firebase.firestore();
-try { firebase.analytics(); } catch (e) {}
-
-// ── AUTH STATE VARS ──
-let currentUser      = null;
-let firestoreHistory = [];
-let firestoreDiary   = [];
-let unsubHistory     = null;
-let unsubDiary       = null;
+// 100% Static — localStorage only. Compatible with GitHub Pages.
 
 // ── DOM REFS ──
 const $ = id => document.getElementById(id);
@@ -213,16 +189,13 @@ function calculate() {
 }
 
 // ══════════════════════════════════════════════
-// PRINT HISTORY (localStorage + Firestore)
+// PRINT HISTORY (localStorage)
 // ══════════════════════════════════════════════
 const HISTORY_KEY = 'printcost_history';
 const loadHistory = () => {
-  if (currentUser) return firestoreHistory;
   try { return JSON.parse(localStorage.getItem(HISTORY_KEY)) || []; } catch { return []; }
 };
-const saveHistory = (l, forceLocal = false) => {
-  if (!currentUser || forceLocal) localStorage.setItem(HISTORY_KEY, JSON.stringify(l));
-};
+const saveHistory = list => localStorage.setItem(HISTORY_KEY, JSON.stringify(list));
 
 function renderHistory() {
   const list = loadHistory();
@@ -239,16 +212,14 @@ function renderHistory() {
     </div>`).join('');
 }
 
-function deleteHistoryItem(idx) {
-  if (currentUser) {
-    const item = firestoreHistory[idx];
-    if (item && item._id) db.collection(`users/${currentUser.uid}/history`).doc(item._id).delete();
-  } else {
-    const list = loadHistory(); list.splice(idx, 1); saveHistory(list); renderHistory();
-  }
-}
+window.deleteHistoryItem = function(idx) {
+  const list = loadHistory();
+  list.splice(idx, 1);
+  saveHistory(list);
+  renderHistory();
+};
 
-$('btnSave').addEventListener('click', async () => {
+$('btnSave').addEventListener('click', () => {
   const name = inp.printName.value.trim() || `Print #${Date.now()}`;
   const now  = new Date();
   const item = {
@@ -258,37 +229,15 @@ $('btnSave').addEventListener('click', async () => {
     grams: inp.filamentUsed.value,
     material: inp.materialType.options[inp.materialType.selectedIndex].text.split('—')[0].trim(),
   };
+  const list = loadHistory();
+  list.unshift(item);
+  if (list.length > 50) list.pop();
+  saveHistory(list);
+  renderHistory();
+  showToast('💾 Guardado en historial');
   const btn = $('btnSave');
-  btn.textContent = '⏳ Guardando...'; btn.disabled = true;
-
-  console.log('🔍 Intento de guardado en historial. Usuario autenticado:', !!currentUser, 'UID:', currentUser?.uid);
-  
-  if (currentUser) {
-    try {
-      console.log('📤 Guardando en Firestore/users/' + currentUser.uid + '/history');
-      const ref = await db.collection(`users/${currentUser.uid}/history`).add({ ...item, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
-      console.log('✅ Guardado exitoso en Firestore:', ref.id);
-      showToast('☁️ ✅ Guardado exitosamente en la nube');
-      btn.textContent = '✅ ¡Guardado en nube!';
-    } catch (e) {
-      console.error('❌ Error Firestore - Code:', e.code, 'Message:', e.message, 'Stack:', e.stack);
-      showToast(`❌ Error: ${e.code || e.message}`, true);
-      setTimeout(() => {
-        showToast('💾 Guardando en localStorage como respaldo...', true);
-        let list;
-        try { list = JSON.parse(localStorage.getItem(HISTORY_KEY)) || []; } catch { list = []; }
-        list.unshift(item); if (list.length > 50) list.pop(); saveHistory(list, true); 
-        firestoreHistory.unshift(item); renderHistory();
-        btn.textContent = '⚠️ Guardado localmente';
-      }, 2000);
-    }
-  } else {
-    console.log('💾 Usuario no autenticado, guardando en localStorage');
-    const list = loadHistory(); list.unshift(item); if (list.length > 50) list.pop(); saveHistory(list); renderHistory();
-    showToast('💾 Guardado localmente');
-    btn.textContent = '✅ Guardado!';
-  }
-  setTimeout(() => { btn.textContent = '💾 Guardar en historial'; btn.disabled = false; }, 1800);
+  btn.textContent = '✅ Guardado!';
+  setTimeout(() => { btn.textContent = '💾 Guardar en historial'; }, 1500);
 });
 
 // Two-step clear
@@ -307,11 +256,8 @@ $('btnClear').addEventListener('click', () => {
     clearTimeout(clearHistoryTimer); clearHistoryPending = false;
     const btn = $('btnClear');
     btn.textContent = '🗑️ Limpiar historial'; btn.style.color = ''; btn.style.borderColor = '';
-    if (currentUser) {
-      const batch = db.batch();
-      firestoreHistory.forEach(i => { if (i._id) batch.delete(db.collection(`users/${currentUser.uid}/history`).doc(i._id)); });
-      batch.commit();
-    } else { localStorage.removeItem(HISTORY_KEY); renderHistory(); }
+    localStorage.removeItem(HISTORY_KEY);
+    renderHistory();
   }
 });
 
@@ -337,14 +283,13 @@ Object.values(inp).forEach(el => {
 });
 
 // ══════════════════════════════════════════════
-// DIARY (localStorage + Firestore)
+// DIARY (localStorage)
 // ══════════════════════════════════════════════
 const DIARY_KEY = 'printcost_diary';
 const loadDiary = () => {
-  if (currentUser) return firestoreDiary;
   try { return JSON.parse(localStorage.getItem(DIARY_KEY)) || []; } catch { return []; }
 };
-const saveDiary = (l, forceLocal = false) => { if (!currentUser || forceLocal) localStorage.setItem(DIARY_KEY, JSON.stringify(l)); };
+const saveDiary = list => localStorage.setItem(DIARY_KEY, JSON.stringify(list));
 
 let diaryFilter = 'all', diarySearch = '', currentType = 'buy';
 
@@ -445,12 +390,12 @@ function renderDiary() {
   }).join('');
 }
 
-function deleteDiaryItem(idx) {
-  if (currentUser) {
-    const item = firestoreDiary[idx];
-    if (item && item._id) db.collection(`users/${currentUser.uid}/diary`).doc(item._id).delete();
-  } else { const data = loadDiary(); data.splice(idx, 1); saveDiary(data); renderDiary(); }
-}
+window.deleteDiaryItem = function(idx) {
+  const data = loadDiary();
+  data.splice(idx, 1);
+  saveDiary(data);
+  renderDiary();
+};
 
 $('typeBuy').addEventListener('click',  () => { currentType = 'buy';  updateTypeUI(); });
 $('typeSell').addEventListener('click', () => { currentType = 'sell'; updateTypeUI(); });
@@ -461,7 +406,7 @@ function updateTypeUI() {
   $('sell-fields').classList.toggle('hidden', currentType !== 'sell');
 }
 
-$('dBtnAdd').addEventListener('click', async () => {
+$('dBtnAdd').addEventListener('click', () => {
   const name = $('dEntryName').value.trim(), amount = parseFloat($('dAmount').value);
   const date = $('dDate').value, notes = $('dNotes').value.trim();
   const cat  = currentType === 'buy' ? $('dBuyCategory').value : $('dSellCategory').value;
@@ -472,35 +417,15 @@ $('dBtnAdd').addEventListener('click', async () => {
     ? new Date(date + 'T12:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })
     : now.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
   const entry = { type: currentType, name, category: cat, amount, date: dateStr, notes };
-  const btn = $('dBtnAdd'); btn.textContent = '⏳ Guardando...'; btn.disabled = true;
-
-  console.log('🔍 Intento de añadir entrada. Usuario autenticado:', !!currentUser, 'UID:', currentUser?.uid);
-
-  if (currentUser) {
-    try {
-      console.log('📤 Guardando en Firestore/users/' + currentUser.uid + '/diary');
-      const ref = await db.collection(`users/${currentUser.uid}/diary`).add({ ...entry, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
-      console.log('✅ Entrada guardada exitosamente en Firestore:', ref.id);
-      showToast('☁️ ✅ Entrada guardada en la nube');
-    } catch (e) {
-      console.error('❌ Error Firestore - Code:', e.code, 'Message:', e.message, 'Stack:', e.stack);
-      showToast(`❌ Error: ${e.code || e.message}`, true);
-      setTimeout(() => {
-        showToast('💾 Guardando en localStorage como respaldo...', true);
-        let data;
-        try { data = JSON.parse(localStorage.getItem(DIARY_KEY)) || []; } catch { data = []; }
-        data.unshift(entry); saveDiary(data, true); 
-        firestoreDiary.unshift(entry); renderDiary();
-      }, 2000);
-    }
-  } else {
-    console.log('💾 Usuario no autenticado, guardando entrada en localStorage');
-    const data = loadDiary(); data.unshift(entry); saveDiary(data); renderDiary();
-    showToast('💾 Guardado localmente');
-  }
+  const data = loadDiary();
+  data.unshift(entry);
+  saveDiary(data);
+  renderDiary();
+  showToast('💾 Entrada guardada');
   $('dEntryName').value = ''; $('dAmount').value = ''; $('dNotes').value = '';
+  const btn = $('dBtnAdd');
   btn.textContent = '✅ Añadido!';
-  setTimeout(() => { btn.textContent = '➕ Añadir entrada'; btn.disabled = false; }, 1500);
+  setTimeout(() => { btn.textContent = '➕ Añadir entrada'; }, 1500);
 });
 
 document.querySelectorAll('.filter-btn').forEach(btn => {
@@ -522,11 +447,8 @@ $('dBtnClearAll').addEventListener('click', () => {
   } else {
     clearTimeout(clearDiaryTimer); clearDiaryPending = false;
     const btn = $('dBtnClearAll'); btn.textContent = '🗑️ Borrar todo el registro'; btn.style.color = ''; btn.style.borderColor = '';
-    if (currentUser) {
-      const batch = db.batch();
-      firestoreDiary.forEach(i => { if (i._id) batch.delete(db.collection(`users/${currentUser.uid}/diary`).doc(i._id)); });
-      batch.commit();
-    } else { localStorage.removeItem(DIARY_KEY); renderDiary(); }
+    localStorage.removeItem(DIARY_KEY);
+    renderDiary();
   }
 });
 
@@ -534,6 +456,16 @@ $('dDate').valueAsDate = new Date();
 
 // ── HELPERS ──
 function escapeHtml(str) { const d = document.createElement('div'); d.textContent = str; return d.innerHTML; }
+
+// ── TOAST ──
+function showToast(msg, isError = false) {
+  let toast = $('appToast');
+  if (!toast) { toast = document.createElement('div'); toast.id = 'appToast'; toast.className = 'toast'; document.body.appendChild(toast); }
+  toast.textContent = msg;
+  toast.className = 'toast' + (isError ? ' toast-error' : '') + ' visible';
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => { toast.className = 'toast'; }, 3000);
+}
 
 // ── CALCULAR BUTTON ──
 const btnCalcular = $('btnCalcular');
@@ -564,186 +496,73 @@ $('dBtnExport').addEventListener('click', () => {
   downloadCSV(`printcost_diario_${new Date().toISOString().slice(0,10)}.csv`, [['Tipo','Descripcion','Categoria',`Importe (${currencySymbol})`,'Fecha','Notas'], ...data.map(i => [i.type === 'buy' ? 'Compra' : 'Venta', i.name, i.category, i.amount, i.date, i.notes || ''])]);
 });
 
-// ══════════════════════════════════════════════
-// AUTH UI
-// ══════════════════════════════════════════════
-let authMode = 'login';
-
-function showAuthModal() {
-  $('authBackdrop').classList.remove('hidden');
-  requestAnimationFrame(() => $('authBackdrop').classList.add('visible'));
-  setTimeout(() => $('authEmail').focus(), 150);
-}
-function hideAuthModal() {
-  $('authBackdrop').classList.remove('visible');
-  setTimeout(() => $('authBackdrop').classList.add('hidden'), 250);
-  $('authError').classList.add('hidden');
-  $('authEmail').value = ''; $('authPassword').value = ''; $('authPasswordConfirm').value = '';
-}
-function setAuthMode(mode) {
-  authMode = mode;
-  const isLogin = mode === 'login';
-  $('authModalTitle').textContent = isLogin ? 'Iniciar sesión' : 'Crear cuenta';
-  $('btnAuthSubmit').textContent  = isLogin ? 'Iniciar sesión' : 'Registrarse';
-  $('authToggleText').textContent = isLogin ? '¿No tienes cuenta?' : '¿Ya tienes cuenta?';
-  $('authToggleMode').textContent = isLogin ? 'Regístrate' : 'Inicia sesión';
-  $('authPasswordConfirmGroup').classList.toggle('hidden', isLogin);
-  $('authError').classList.add('hidden');
-}
-
-function updateAuthUI(user) {
-  const loginBtn = $('authLoginBtn'), userAvatar = $('authUserAvatar');
-  if (user) {
-    loginBtn.classList.add('hidden'); userAvatar.classList.remove('hidden');
-    const avatarImg = $('authAvatarImg'), avatarInit = $('authAvatarInitial');
-    if (user.photoURL) { avatarImg.src = user.photoURL; avatarImg.classList.remove('hidden'); avatarInit.classList.add('hidden'); }
-    else { avatarImg.classList.add('hidden'); avatarInit.classList.remove('hidden'); avatarInit.textContent = (user.displayName || user.email || '?')[0].toUpperCase(); }
-    $('authUserName').textContent  = user.displayName || 'Usuario';
-    $('authUserEmail').textContent = user.email || '';
-  } else {
-    loginBtn.classList.remove('hidden'); userAvatar.classList.add('hidden');
-    $('authUserMenu')?.classList.remove('visible');
+// ── CSV IMPORT ──
+function parseCSV(text) {
+  text = text.replace(/^\uFEFF/, '');
+  const lines = text.split(/\r?\n/).filter(l => l.trim());
+  if (lines.length < 2) return [];
+  function parseLine(line) {
+    const fields = []; let cur = '', inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') { if (inQ && line[i+1] === '"') { cur += '"'; i++; } else inQ = !inQ; }
+      else if (ch === ',' && !inQ) { fields.push(cur.trim()); cur = ''; }
+      else cur += ch;
+    }
+    fields.push(cur.trim());
+    return fields;
   }
+  const headers = parseLine(lines[0]).map(h => h.toLowerCase().replace(/[^a-záéíóúüñ]/gi, ''));
+  const idx = {
+    tipo:      headers.findIndex(h => h.includes('tipo')),
+    nombre:    headers.findIndex(h => h.includes('desc') || h.includes('nombre') || h.includes('product')),
+    categoria: headers.findIndex(h => h.includes('categ')),
+    importe:   headers.findIndex(h => h.includes('import') || h.includes('amount') || h.includes('precio')),
+    fecha:     headers.findIndex(h => h.includes('fecha') || h.includes('date')),
+    notas:     headers.findIndex(h => h.includes('nota') || h.includes('note') || h.includes('coment')),
+  };
+  const entries = [];
+  for (let i = 1; i < lines.length; i++) {
+    const cols = parseLine(lines[i]);
+    if (!cols.length || (cols.length === 1 && !cols[0])) continue;
+    const get = (key) => idx[key] >= 0 ? (cols[idx[key]] || '').trim() : '';
+    const tipoRaw = get('tipo').toLowerCase();
+    const type = tipoRaw.includes('venta') || tipoRaw === 'sell' ? 'sell' : 'buy';
+    const name = get('nombre');
+    if (!name) continue;
+    const amountRaw = get('importe').replace(',', '.').replace(/[^\d.-]/g, '');
+    const amount = parseFloat(amountRaw) || 0;
+    const rawCat = get('categoria').toLowerCase().replace(/\s+/g, '');
+    const buyCatMap  = { filamento:'filamento', resina:'resina', repuesto:'repuesto', herramienta:'herramienta', embalaje:'embalaje' };
+    const sellCatMap = { pieza:'pieza', prototipo:'prototipo', figura:'figura', funcional:'funcional' };
+    const catNorm = buyCatMap[rawCat] || sellCatMap[rawCat] || 'otro';
+    const fecha = get('fecha') || new Date().toLocaleDateString('es-ES', { day:'2-digit', month:'short', year:'numeric' });
+    const notas = get('notas');
+    entries.push({ type, name, category: catNorm, amount, date: fecha, notes: notas });
+  }
+  return entries;
 }
 
-function showToast(msg, isError = false) {
-  let toast = $('appToast');
-  if (!toast) { toast = document.createElement('div'); toast.id = 'appToast'; toast.className = 'toast'; document.body.appendChild(toast); }
-  toast.textContent = msg;
-  toast.className = 'toast' + (isError ? ' toast-error' : '') + ' visible';
-  clearTimeout(toast._t);
-  toast._t = setTimeout(() => { toast.className = 'toast'; }, 3000);
-}
-
-// ── MIGRATION from localStorage to Firestore ──
-const MIGRATION_KEY = 'printcost_migration_done';
-function offerMigration(user) {
-  const migrationDone = localStorage.getItem(MIGRATION_KEY);
-  if (migrationDone) {
-    console.log('✅ Migración ya realizada anteriormente, no mostrar banner');
-    return;
-  }
-  const lh = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
-  const ld = JSON.parse(localStorage.getItem(DIARY_KEY)   || '[]');
-  if (!lh.length && !ld.length) { localStorage.setItem(MIGRATION_KEY, 'true'); return; }
-  setTimeout(() => {
-    if (firestoreHistory.length > 0 || firestoreDiary.length > 0) { localStorage.setItem(MIGRATION_KEY, 'true'); return; }
-    const total = lh.length + ld.length; if (!total) return;
-    const banner = document.createElement('div');
-    banner.id = 'migrationBanner'; banner.className = 'migration-banner';
-    banner.innerHTML = `<div class="migration-inner"><span>📦 Tienes ${total} entradas locales. ¿Subirlas a la nube?</span><div class="migration-actions"><button id="btnMigYes" class="btn-mig-yes">☁️ Subir</button><button id="btnMigNo" class="btn-mig-no">No, descartar</button></div></div>`;
-    document.body.appendChild(banner);
-    $('btnMigYes').addEventListener('click', async () => {
-      banner.remove();
-      const batch = db.batch();
-      lh.forEach(item => { const ref = db.collection(`users/${user.uid}/history`).doc(); batch.set(ref, { ...item, createdAt: firebase.firestore.FieldValue.serverTimestamp() }); });
-      ld.forEach(item => { const ref = db.collection(`users/${user.uid}/diary`).doc(); batch.set(ref, { ...item, createdAt: firebase.firestore.FieldValue.serverTimestamp() }); });
-      try { 
-        await batch.commit(); 
-        localStorage.removeItem(HISTORY_KEY); 
-        localStorage.removeItem(DIARY_KEY);
-        localStorage.setItem(MIGRATION_KEY, 'true');
-        console.log(`✅ ${total} entradas subidas a la nube`);
-        showToast(`✅ ${total} entradas subidas a la nube`); 
-      }
-      catch (e) { 
-        console.error('Error migración:', e);
-        showToast('❌ Error al migrar datos', true); 
-      }
-    });
-    $('btnMigNo').addEventListener('click', () => { 
-      localStorage.setItem(MIGRATION_KEY, 'true');
-      banner.remove(); 
-      showToast('💾 Datos locales mantenidos');
-    });
-  }, 1500);
-}
-
-// ── AUTH EVENT LISTENERS ──
-$('authLoginBtn').addEventListener('click', () => { setAuthMode('login'); showAuthModal(); });
-$('authUserAvatar').addEventListener('click', e => { e.stopPropagation(); $('authUserMenu').classList.toggle('visible'); });
-document.addEventListener('click', e => { if (!$('authUserAvatar').contains(e.target)) $('authUserMenu')?.classList.remove('visible'); });
-$('authLogout').addEventListener('click', () => { auth.signOut(); showToast('👋 Sesión cerrada'); });
-$('authClose').addEventListener('click', hideAuthModal);
-$('authBackdrop').addEventListener('click', e => { if (e.target === $('authBackdrop')) hideAuthModal(); });
-$('authToggleMode').addEventListener('click', () => setAuthMode(authMode === 'login' ? 'register' : 'login'));
-
-$('btnGoogle').addEventListener('click', async () => {
-  try {
-    await auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
-    hideAuthModal(); showToast('✅ Sesión iniciada con Google');
-  } catch (e) {
-    $('authError').textContent = 'Error al iniciar con Google. ' + (e.message || '');
-    $('authError').classList.remove('hidden');
-  }
-});
-
-$('btnAuthSubmit').addEventListener('click', async () => {
-  const email = $('authEmail').value.trim(), pass = $('authPassword').value, pass2 = $('authPasswordConfirm').value;
-  const errEl = $('authError'); errEl.classList.add('hidden');
-  if (!email || !pass) { errEl.textContent = 'Rellena el correo y la contraseña.'; errEl.classList.remove('hidden'); return; }
-  if (authMode === 'register') {
-    if (pass !== pass2) { errEl.textContent = 'Las contraseñas no coinciden.'; errEl.classList.remove('hidden'); return; }
-    if (pass.length < 6) { errEl.textContent = 'La contraseña necesita al menos 6 caracteres.'; errEl.classList.remove('hidden'); return; }
-    try { await auth.createUserWithEmailAndPassword(email, pass); hideAuthModal(); showToast('✅ Cuenta creada. ¡Bienvenido!'); }
-    catch (e) { errEl.textContent = translateAuthError(e.code); errEl.classList.remove('hidden'); }
-  } else {
-    try { await auth.signInWithEmailAndPassword(email, pass); hideAuthModal(); showToast('✅ Sesión iniciada'); }
-    catch (e) { errEl.textContent = translateAuthError(e.code); errEl.classList.remove('hidden'); }
-  }
-});
-$('authPassword').addEventListener('keydown', e => { if (e.key === 'Enter') $('btnAuthSubmit').click(); });
-$('authPasswordConfirm').addEventListener('keydown', e => { if (e.key === 'Enter') $('btnAuthSubmit').click(); });
-
-function translateAuthError(code) {
-  const m = { 'auth/user-not-found':'No existe cuenta con ese correo.', 'auth/wrong-password':'Contraseña incorrecta.', 'auth/email-already-in-use':'Ya existe una cuenta con ese correo.', 'auth/invalid-email':'El correo no es válido.', 'auth/too-many-requests':'Demasiados intentos. Inténtalo más tarde.', 'auth/weak-password':'Contraseña demasiado débil.', 'auth/invalid-credential':'Correo o contraseña incorrectos.' };
-  return m[code] || 'Error de autenticación. Inténtalo de nuevo.';
-}
-
-// ── FIREBASE AUTH STATE ──
-auth.onAuthStateChanged(user => {
-  if (user) {
-    currentUser = user;
-    console.log('✅ Usuario autenticado:', user.uid, user.email);
-    updateAuthUI(user);
-    // Subscribe to Firestore history
-    unsubHistory = db.collection(`users/${user.uid}/history`)
-      .orderBy('createdAt', 'desc')
-      .onSnapshot(
-        snap => { 
-          console.log('📋 Historial cargado:', snap.docs.length, 'documentos');
-          firestoreHistory = snap.docs.map(d => ({ _id: d.id, ...d.data() })); 
-          renderHistory(); 
-        },
-        error => { 
-          console.error('❌ Error al cargar historial:', error.code, error.message);
-          showToast(`❌ Error cargando historial: ${error.code}`, true);
-        }
-      );
-    // Subscribe to Firestore diary
-    unsubDiary = db.collection(`users/${user.uid}/diary`)
-      .orderBy('createdAt', 'desc')
-      .onSnapshot(
-        snap => { 
-          console.log('📒 Diario cargado:', snap.docs.length, 'documentos');
-          firestoreDiary = snap.docs.map(d => ({ _id: d.id, ...d.data() })); 
-          if (!$('page-diary').classList.contains('page-hidden')) renderDiary(); 
-        },
-        error => { 
-          console.error('❌ Error al cargar diario:', error.code, error.message);
-          showToast(`❌ Error cargando diario: ${error.code}`, true);
-        }
-      );
-    offerMigration(user);
-  } else {
-    currentUser = null;
-    console.log('🚪 Usuario desconectado');
-    if (unsubHistory) { unsubHistory(); unsubHistory = null; }
-    if (unsubDiary)   { unsubDiary();   unsubDiary   = null; }
-    firestoreHistory = []; firestoreDiary = [];
-    updateAuthUI(null); renderHistory();
-    if (!$('page-diary').classList.contains('page-hidden')) renderDiary();
-  }
+$('dBtnImport').addEventListener('click', () => $('dImportFile').click());
+$('dImportFile').addEventListener('change', async function() {
+  const file = this.files[0];
+  if (!file) return;
+  this.value = '';
+  const text = await file.text();
+  const imported = parseCSV(text);
+  if (!imported.length) { showToast('⚠️ No se encontraron entradas válidas en el CSV', true); return; }
+  const existing = loadDiary();
+  const key = e => `${e.type}|${e.name}|${e.amount}|${e.date}`;
+  const existingKeys = new Set(existing.map(key));
+  const newEntries = imported.filter(e => !existingKeys.has(key(e)));
+  const skipped = imported.length - newEntries.length;
+  if (!newEntries.length) { showToast(`⚠️ Todas las entradas ya existían (${skipped} omitidas)`, true); return; }
+  const merged = [...newEntries, ...existing];
+  saveDiary(merged);
+  renderDiary();
+  let msg = `✅ ${newEntries.length} entradas importadas`;
+  if (skipped) msg += ` (${skipped} duplicadas omitidas)`;
+  showToast(msg);
 });
 
 // ── INIT ──

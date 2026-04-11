@@ -30,7 +30,7 @@
   --surface-hover: rgba(255,255,255,0.9);
   --border: rgba(0,0,0,0.08);
   --text: #1a1a2e;
-  --text-muted: #5555770;
+  --text-muted: #555577;
   --shadow: 0 8px 32px rgba(0,0,0,0.12);
 }
 
@@ -234,6 +234,7 @@ select {
   outline: none;
   transition: border-color var(--transition), box-shadow var(--transition);
   -webkit-appearance: none;
+  appearance: none;
 }
 input:focus, select:focus {
   border-color: var(--primary);
@@ -518,6 +519,27 @@ select {
   transform: translateY(-1px);
 }
 .btn-export:active { transform: translateY(0); }
+
+/* Import CSV button */
+.btn-import {
+  flex: 1;
+  padding: 0.6rem 1rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(52,211,153,0.35);
+  background: rgba(52,211,153,0.07);
+  color: var(--green);
+  font-family: 'Inter', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--transition), box-shadow var(--transition), transform var(--transition);
+}
+.btn-import:hover {
+  background: rgba(52,211,153,0.15);
+  box-shadow: 0 0 14px rgba(52,211,153,0.2);
+  transform: translateY(-1px);
+}
+.btn-import:active { transform: translateY(0); }
 
 /* Action rows – export + clear side by side */
 .history-actions,
@@ -815,6 +837,7 @@ input[type="date"] {
   outline: none;
   transition: border-color var(--transition), box-shadow var(--transition);
   -webkit-appearance: none;
+  appearance: none;
   color-scheme: dark;
 }
 [data-theme="light"] input[type="date"] { color-scheme: light; background: #fff; }
