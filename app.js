@@ -1,5 +1,6 @@
 // ── PrintCost · app.js ──────────────────────────────────────────────────────
 // 100% Static — localStorage only. Compatible with GitHub Pages.
+// Auto-backup CSV via File System Access API (Chrome/Edge).
 
 // ── DOM REFS ──
 const $ = id => document.getElementById(id);
@@ -234,6 +235,7 @@ $('btnSave').addEventListener('click', () => {
   if (list.length > 50) list.pop();
   saveHistory(list);
   renderHistory();
+  autoSaveCSVs(true);
   showToast('💾 Guardado en historial');
   const btn = $('btnSave');
   btn.textContent = '✅ Guardado!';
@@ -421,6 +423,7 @@ $('dBtnAdd').addEventListener('click', () => {
   data.unshift(entry);
   saveDiary(data);
   renderDiary();
+  autoSaveCSVs(true);
   showToast('💾 Entrada guardada');
   $('dEntryName').value = ''; $('dAmount').value = ''; $('dNotes').value = '';
   const btn = $('dBtnAdd');
@@ -563,6 +566,135 @@ $('dImportFile').addEventListener('change', async function() {
   let msg = `✅ ${newEntries.length} entradas importadas`;
   if (skipped) msg += ` (${skipped} duplicadas omitidas)`;
   showToast(msg);
+});
+
+// ══════════════════════════════════════════════
+// AUTO-BACKUP CSV (File System Access API)
+// ══════════════════════════════════════════════
+let autoBackupDirHandle = null;
+const AUTOBACKUP_KEY = 'printcost_autobackup_enabled';
+const FS_SUPPORTED = 'showDirectoryPicker' in window;
+
+function buildHistoryCSV() {
+  const list = loadHistory();
+  if (!list.length) return null;
+  const BOM = '\uFEFF';
+  const rows = [['Nombre','Fecha','Gramos (g)','Material','Precio final'], ...list.map(i => [i.name, i.date, i.grams, i.material, i.price])];
+  return BOM + rows.map(r => r.map(cell => { const s = String(cell ?? '').replace(/"/g, '""'); return /[,"\n\r]/.test(s) ? `"${s}"` : s; }).join(',')).join('\r\n');
+}
+
+function buildDiaryCSV() {
+  const data = loadDiary();
+  if (!data.length) return null;
+  const BOM = '\uFEFF';
+  const rows = [['Tipo','Descripcion','Categoria',`Importe (${currencySymbol})`,'Fecha','Notas'], ...data.map(i => [i.type === 'buy' ? 'Compra' : 'Venta', i.name, i.category, i.amount, i.date, i.notes || ''])];
+  return BOM + rows.map(r => r.map(cell => { const s = String(cell ?? '').replace(/"/g, '""'); return /[,"\n\r]/.test(s) ? `"${s}"` : s; }).join(',')).join('\r\n');
+}
+
+async function writeCSVToDir(dirHandle, filename, csvContent) {
+  const fileHandle = await dirHandle.getFileHandle(filename, { create: true });
+  const writable = await fileHandle.createWritable();
+  await writable.write(csvContent);
+  await writable.close();
+}
+
+async function autoSaveCSVs(silent = false) {
+  if (!autoBackupDirHandle) return;
+  try {
+    const histCSV = buildHistoryCSV();
+    const diaryCSV = buildDiaryCSV();
+    const today = new Date().toISOString().slice(0,10);
+    if (histCSV) await writeCSVToDir(autoBackupDirHandle, `printcost_historial_${today}.csv`, histCSV);
+    if (diaryCSV) await writeCSVToDir(autoBackupDirHandle, `printcost_diario_${today}.csv`, diaryCSV);
+    if (!silent) showToast('✅ CSV guardado automáticamente');
+  } catch (e) {
+    if (e.name === 'NotAllowedError') {
+      autoBackupDirHandle = null;
+      updateBackupBtn();
+      showToast('⚠️ Permiso de carpeta perdido. Reactiva el auto-backup.', true);
+    } else {
+      if (!silent) showToast('❌ Error al guardar CSV', true);
+    }
+  }
+}
+
+function updateBackupBtn() {
+  const btn = $('btnAutoBackup');
+  if (!btn) return;
+  if (!FS_SUPPORTED) {
+    btn.textContent = '❌ No compatible';
+    btn.title = 'Tu navegador no soporta esta función. Usa Chrome o Edge.';
+    btn.disabled = true;
+    btn.classList.remove('backup-active');
+    return;
+  }
+  if (autoBackupDirHandle) {
+    btn.textContent = '📂 Auto-backup ON';
+    btn.title = `Guardando en: ${autoBackupDirHandle.name}\nHaz clic para desactivar`;
+    btn.classList.add('backup-active');
+  } else {
+    btn.textContent = '📂 Auto-backup';
+    btn.title = 'Activa el guardado automático de CSV al cambiar datos';
+    btn.classList.remove('backup-active');
+  }
+}
+
+async function toggleAutoBackup() {
+  if (!FS_SUPPORTED) {
+    alert('Tu navegador no soporta esta función.\nUsa Chrome o Edge para el auto-backup CSV.');
+    return;
+  }
+  if (autoBackupDirHandle) {
+    // Disable
+    autoBackupDirHandle = null;
+    updateBackupBtn();
+    showToast('🔴 Auto-backup desactivado');
+  } else {
+    // Enable — pick folder
+    try {
+      autoBackupDirHandle = await window.showDirectoryPicker({ mode: 'readwrite', startIn: 'documents' });
+      updateBackupBtn();
+      showToast('🟢 Auto-backup activado — carpeta: ' + autoBackupDirHandle.name);
+      await autoSaveCSVs(true); // Save immediately
+    } catch (e) {
+      if (e.name !== 'AbortError') showToast('❌ No se pudo acceder a la carpeta', true);
+    }
+  }
+}
+
+// Inject backup button into header
+function injectBackupButton() {
+  const controls = document.querySelector('.header-controls');
+  if (!controls) return;
+  const btn = document.createElement('button');
+  btn.id = 'btnAutoBackup';
+  btn.className = 'btn-autobackup';
+  btn.textContent = '📂 Auto-backup';
+  btn.title = 'Activa el guardado automático de CSV al cambiar datos';
+  btn.addEventListener('click', toggleAutoBackup);
+  controls.insertBefore(btn, controls.firstChild);
+  updateBackupBtn();
+}
+injectBackupButton();
+
+// Hook into save functions to trigger auto-backup
+const _origSaveHistory = saveHistory;
+const saveHistoryWithBackup = list => {
+  _origSaveHistory(list);
+  autoSaveCSVs(true);
+};
+// Override the save in the btnSave listener (we patch saveDiary & saveHistory calls)
+// We do this by wrapping: re-declare to trigger backup
+const _saveDiaryOrig = saveDiary;
+window._autoSaveCSVs = autoSaveCSVs;
+
+// Patch: auto-save on diary add/delete
+const _origSaveDiary = saveDiary;
+document.addEventListener('printcost:saved', () => autoSaveCSVs(true));
+
+// Trigger auto-backup on page hide (best effort)
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && autoBackupDirHandle) autoSaveCSVs(true);
 });
 
 // ── INIT ──

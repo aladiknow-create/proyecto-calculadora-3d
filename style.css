@@ -126,6 +126,39 @@ body::after {
 .theme-icon { width: 18px; height: 18px; }
 .hidden { display: none !important; }
 
+/* ── AUTO-BACKUP BUTTON ── */
+.btn-autobackup {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.85rem;
+  border-radius: 99px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-family: 'Inter', sans-serif;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition);
+  white-space: nowrap;
+}
+.btn-autobackup:hover {
+  border-color: rgba(52,211,153,0.4);
+  color: var(--green);
+  background: rgba(52,211,153,0.07);
+}
+.btn-autobackup.backup-active {
+  border-color: rgba(52,211,153,0.5);
+  background: rgba(52,211,153,0.12);
+  color: var(--green);
+  box-shadow: 0 0 12px rgba(52,211,153,0.15);
+}
+.btn-autobackup:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 /* ── MAIN ── */
 .main {
   max-width: 1300px;
